@@ -40,6 +40,13 @@ class GitHubContributionGenerator:
             print("Git repository initialized.")
         else:
             print("Git repository already exists.")
+        
+        # Ensure we're on main branch (GitHub's default)
+        self.run_command("git checkout -b main 2>/dev/null || git checkout main")
+        
+        # Set up proper Git configuration for contributions
+        self.run_command('git config user.name "hamid_bozabal"')
+        self.run_command('git config user.email "hamid@example.com"')
     
     def create_commit_file(self, filename, content):
         """Create a file with content and add it to Git"""
@@ -51,7 +58,38 @@ class GitHubContributionGenerator:
     def make_commit(self, message, date):
         """Make a commit with a specific date"""
         date_str = date.strftime("%Y-%m-%d %H:%M:%S")
-        self.run_command(f'git commit -m "{message}" --date="{date_str}"')
+        # Use environment variables to set the commit date properly
+        env = os.environ.copy()
+        env['GIT_AUTHOR_DATE'] = date_str
+        env['GIT_COMMITTER_DATE'] = date_str
+        
+        # Make the commit with proper environment variables
+        try:
+            subprocess.run(
+                f'git commit -m "{message}"',
+                shell=True, cwd=self.repo_path, env=env, check=True,
+                capture_output=True, text=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Error making commit: {e}")
+            return False
+        return True
+    
+    def verify_commits(self):
+        """Verify that commits have proper dates"""
+        try:
+            # Get the last few commits to verify dates
+            result = subprocess.run(
+                "git log --oneline --date=short --pretty=format:'%h %ad %s' -10",
+                shell=True, cwd=self.repo_path, capture_output=True, text=True
+            )
+            if result.stdout:
+                print("✅ Recent commits with dates:")
+                print(result.stdout)
+            else:
+                print("⚠️  No commits found to verify")
+        except Exception as e:
+            print(f"⚠️  Could not verify commits: {e}")
     
     def generate_realistic_commit_message(self):
         """Generate realistic commit messages"""
@@ -99,11 +137,11 @@ class GitHubContributionGenerator:
         """Generate realistic commit dates for the current year"""
         dates = []
         start_date = datetime.datetime(self.current_year, 1, 1)
-        end_date = datetime.datetime(self.current_year, 12, 31)
+        end_date = datetime.datetime.now()  # Only up to today
         
         # Generate dates with some clustering (more commits on weekdays)
         for _ in range(self.target_commits):
-            # Random date within the year
+            # Random date within the year up to today
             random_days = random.randint(0, (end_date - start_date).days)
             date = start_date + datetime.timedelta(days=random_days)
             
@@ -133,8 +171,11 @@ class GitHubContributionGenerator:
         if not self.run_command("git log --oneline"):
             print("Creating initial commit...")
             self.create_commit_file("README.md", "# Project\n\nThis is a sample project.")
-            self.make_commit("Initial commit", commit_dates[0])
-            commit_dates = commit_dates[1:]  # Remove the first date since we used it
+            if self.make_commit("Initial commit", commit_dates[0]):
+                commit_dates = commit_dates[1:]  # Remove the first date since we used it
+            else:
+                print("Failed to create initial commit")
+                return
         
         # Generate commits
         for i, date in enumerate(commit_dates):
@@ -145,7 +186,9 @@ class GitHubContributionGenerator:
             # Create and commit the file
             self.create_commit_file(filename, content)
             message = self.generate_realistic_commit_message()
-            self.make_commit(message, date)
+            if not self.make_commit(message, date):
+                print(f"Failed to create commit {i+1}")
+                continue
             
             # Progress indicator
             if (i + 1) % 50 == 0:
@@ -154,10 +197,18 @@ class GitHubContributionGenerator:
         print(f"\n✅ Successfully created {self.target_commits} commits!")
         print(f"📅 Commits span from {commit_dates[0].strftime('%Y-%m-%d')} to {commit_dates[-1].strftime('%Y-%m-%d')}")
         print(f"📁 Repository location: {self.repo_path}")
-        print("\nTo push to GitHub:")
+        
+        # Verify commits
+        print("\n🔍 Verifying commits...")
+        self.verify_commits()
+        
+        print("\n📋 IMPORTANT: To make contributions show on GitHub profile:")
         print("1. Create a new repository on GitHub")
-        print("2. Run: git remote add origin <your-repo-url>")
-        print("3. Run: git push -u origin main")
+        print("2. Make sure your GitHub email matches: hamid@example.com")
+        print("3. Or update the email in the script to match your GitHub email")
+        print("4. Run: git remote add origin <your-repo-url>")
+        print("5. Run: git push -u origin main")
+        print("6. Wait a few minutes for GitHub to update your profile")
 
 def main():
     """Main function"""
