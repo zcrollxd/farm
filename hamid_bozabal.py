@@ -15,7 +15,8 @@ class GitHubContributionGenerator:
     def __init__(self, repo_path=".", target_commits=500):
         self.repo_path = Path(repo_path).resolve()
         self.target_commits = target_commits
-        self.current_year = datetime.datetime.now().year
+        # Use 2024 to ensure all commits are in the past
+        self.current_year = 2024
         
     def run_command(self, command, cwd=None):
         """Run a shell command and return the result"""
@@ -134,14 +135,14 @@ class GitHubContributionGenerator:
         return random.choice(contents)
     
     def generate_dates(self):
-        """Generate realistic commit dates for the current year"""
+        """Generate realistic commit dates for 2024 (past year)"""
         dates = []
-        start_date = datetime.datetime(self.current_year, 1, 1)
-        end_date = datetime.datetime.now()  # Only up to today
+        start_date = datetime.datetime(2024, 1, 1)
+        end_date = datetime.datetime(2024, 12, 31)  # End of 2024
         
         # Generate dates with some clustering (more commits on weekdays)
         for _ in range(self.target_commits):
-            # Random date within the year up to today
+            # Random date within 2024
             random_days = random.randint(0, (end_date - start_date).days)
             date = start_date + datetime.timedelta(days=random_days)
             
@@ -195,7 +196,7 @@ class GitHubContributionGenerator:
                 print(f"Created {i + 1} commits...")
         
         print(f"\n✅ Successfully created {self.target_commits} commits!")
-        print(f"📅 Commits span from {commit_dates[0].strftime('%Y-%m-%d')} to {commit_dates[-1].strftime('%Y-%m-%d')}")
+        print(f"📅 Commits span from {commit_dates[0].strftime('%Y-%m-%d')} to {commit_dates[-1].strftime('%Y-%m-%d')} (all in 2024)")
         print(f"📁 Repository location: {self.repo_path}")
         
         # Verify commits
